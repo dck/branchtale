@@ -21,6 +21,7 @@ func TestLoad(t *testing.T) {
 		os.Setenv("GITHUB_TOKEN", "test-github-token")
 		os.Setenv("YANDEX_GPT_API_KEY", "test-yandex-key")
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
+		os.Setenv("CONTENT_GENERATION", "local")
 
 		cfg, err := Load()
 		if err != nil {
@@ -39,8 +40,12 @@ func TestLoad(t *testing.T) {
 			t.Errorf("expected YandexFolderID 'test-folder-id', got '%s'", cfg.YandexFolderID)
 		}
 
-		if cfg.MainBranch != "main" {
-			t.Errorf("expected MainBranch 'main', got '%s'", cfg.MainBranch)
+		if cfg.ContentGeneration != "local" {
+			t.Errorf("expected ContentGeneration 'local', got '%s'", cfg.ContentGeneration)
+		}
+
+		if cfg.UseAI {
+			t.Errorf("expected UseAI to be false, got true")
 		}
 	})
 
@@ -48,15 +53,39 @@ func TestLoad(t *testing.T) {
 		os.Setenv("GITHUB_TOKEN", "test-github-token")
 		os.Setenv("YANDEX_GPT_API_KEY", "test-yandex-key")
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
-		os.Setenv("MAIN_BRANCH", "master")
+		os.Setenv("CONTENT_GENERATION", "local")
 
 		cfg, err := Load()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		if cfg.MainBranch != "master" {
-			t.Errorf("expected MainBranch 'master', got '%s'", cfg.MainBranch)
+		if cfg.ContentGeneration != "local" {
+			t.Errorf("expected ContentGeneration 'local', got '%s'", cfg.ContentGeneration)
+		}
+
+		if cfg.UseAI {
+			t.Errorf("expected UseAI to be false, got true")
+		}
+	})
+
+	t.Run("ai mode enabled", func(t *testing.T) {
+		os.Setenv("GITHUB_TOKEN", "test-github-token")
+		os.Setenv("YANDEX_GPT_API_KEY", "test-yandex-key")
+		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
+		os.Setenv("CONTENT_GENERATION", "yandex")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if cfg.ContentGeneration != "yandex" {
+			t.Errorf("expected ContentGeneration 'yandex', got '%s'", cfg.ContentGeneration)
+		}
+
+		if !cfg.UseAI {
+			t.Errorf("expected UseAI to be true, got false")
 		}
 	})
 
@@ -64,6 +93,7 @@ func TestLoad(t *testing.T) {
 		os.Unsetenv("GITHUB_TOKEN")
 		os.Setenv("YANDEX_GPT_API_KEY", "test-yandex-key")
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
+		os.Setenv("CONTENT_GENERATION", "yandex")
 
 		_, err := Load()
 		if err == nil {
@@ -80,6 +110,7 @@ func TestLoad(t *testing.T) {
 		os.Setenv("GITHUB_TOKEN", "test-github-token")
 		os.Unsetenv("YANDEX_GPT_API_KEY")
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
+		os.Setenv("CONTENT_GENERATION", "yandex")
 
 		_, err := Load()
 		if err == nil {
@@ -96,6 +127,7 @@ func TestLoad(t *testing.T) {
 		os.Setenv("GITHUB_TOKEN", "test-github-token")
 		os.Setenv("YANDEX_GPT_API_KEY", "test-yandex-key")
 		os.Unsetenv("YANDEX_FOLDER_ID")
+		os.Setenv("CONTENT_GENERATION", "yandex")
 
 		_, err := Load()
 		if err == nil {
