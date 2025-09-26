@@ -47,6 +47,12 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 	fmt.Printf("Current branch: %s\n", s.greenFunc(repoInfo.CurrentBranch))
 
+	if repoInfo.IsOnMain {
+		fmt.Println("You are on the main branch.")
+	} else {
+		fmt.Println("You are already on a feature branch.")
+	}
+
 	return nil
 }
 
