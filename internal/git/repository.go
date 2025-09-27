@@ -198,19 +198,6 @@ func (s *Repository) CheckoutBranch(ctx context.Context, branchName string) erro
 	return nil
 }
 
-func (s *Repository) GetRemoteURL(ctx context.Context) (string, error) {
-	remote, err := s.repo.Remote("origin")
-	if err != nil {
-		return "", fmt.Errorf("failed to get origin remote: %w", err)
-	}
-
-	if len(remote.Config().URLs) == 0 {
-		return "", fmt.Errorf("no URLs configured for origin remote")
-	}
-
-	return remote.Config().URLs[0], nil
-}
-
 func (s *Repository) getCommitsBetween(from, to *object.Commit) ([]*object.Commit, error) {
 	var commits []*object.Commit
 
