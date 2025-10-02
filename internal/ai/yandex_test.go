@@ -23,7 +23,6 @@ func TestYandexGPT_NewYandexGPT(t *testing.T) {
 	}
 }
 
-// TestYandexGPTRequest tests the request structure
 func TestYandexGPTRequest_Structure(t *testing.T) {
 	req := YandexGPTRequest{
 		ModelURI: "gpt://test-folder/yandexgpt-lite/latest",

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -198,6 +199,59 @@ func (s *Repository) CheckoutBranch(ctx context.Context, branchName string) erro
 	return nil
 }
 
+func (s *Repository) GetRemoteURL(remoteName string) (string, error) {
+	remote, err := s.repo.Remote(remoteName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	config := remote.Config()
+	if len(config.URLs) == 0 {
+		return "", fmt.Errorf("no URLs found for remote %s", remoteName)
+	}
+
+	return config.URLs[0], nil
+}
+
+func (s *Repository) BranchExistsOnRemote(ctx context.Context, branchName, remoteName string) (bool, error) {
+	remote, err := s.repo.Remote(remoteName)
+	if err != nil {
+		return false, fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	refs, err := remote.List(&git.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to list remote refs: %w", err)
+	}
+
+	branchRef := plumbing.NewBranchReferenceName(branchName)
+	for _, ref := range refs {
+		if ref.Name().Short() == branchRef.Short() {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (s *Repository) PushBranch(ctx context.Context, branchName, remoteName string) error {
+	remote, err := s.repo.Remote(remoteName)
+	if err != nil {
+		return fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branchName, branchName))
+
+	err = remote.PushContext(ctx, &git.PushOptions{
+		RefSpecs: []config.RefSpec{refSpec},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to push branch: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Repository) getCommitsBetween(from, to *object.Commit) ([]*object.Commit, error) {
 	var commits []*object.Commit
 
@@ -211,7 +265,7 @@ func (s *Repository) getCommitsBetween(from, to *object.Commit) ([]*object.Commi
 
 	err = iter.ForEach(func(commit *object.Commit) error {
 		if commit.Hash == from.Hash {
-			return fmt.Errorf("reached base commit") // Stop iteration
+			return fmt.Errorf("reached base commit")
 		}
 		commits = append(commits, commit)
 		return nil
