@@ -11,9 +11,9 @@ type Config struct {
 	YandexFolderID    string
 	BranchPrefix      string
 	Verbose           bool
-	Interactive       bool
 	ContentGeneration string
 	UseAI             bool
+	DryRun            bool
 }
 
 func Load() (*Config, error) {

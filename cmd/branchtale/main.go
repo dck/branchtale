@@ -14,7 +14,7 @@ import (
 var (
 	branchPrefix      string
 	verbose           bool
-	interactive       bool
+	dryRun            bool
 	contentGeneration string
 )
 
@@ -36,8 +36,8 @@ func main() {
 func init() {
 	rootCmd.Flags().StringVarP(&branchPrefix, "prefix", "p", "", "Branch name prefix (e.g., 'feature/xyz-123-')")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
-	rootCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Enable interactive mode with confirmations")
 	rootCmd.Flags().StringVarP(&contentGeneration, "content-generation", "c", "local", "Content generation mode (e.g., 'local', 'yandex')")
+	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Enable dry run mode (no changes will be pushed or PR created)")
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
@@ -50,8 +50,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	cfg.BranchPrefix = branchPrefix
 	cfg.Verbose = verbose
-	cfg.Interactive = interactive
 	cfg.ContentGeneration = contentGeneration
+	cfg.DryRun = dryRun
 
 	if cfg.Verbose {
 		color.Green("✓ Configuration loaded successfully")

@@ -12,7 +12,8 @@ import (
 )
 
 type Repository struct {
-	repo *git.Repository
+	repo   *git.Repository
+	dryRun bool
 }
 
 type RepoInfo struct {
@@ -26,13 +27,13 @@ type DiffInfo struct {
 	Commits []*object.Commit
 }
 
-func NewRepository(repoPath string) (*Repository, error) {
+func NewRepository(repoPath string, dryRun bool) (*Repository, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open git repository: %w", err)
 	}
 
-	return &Repository{repo: repo}, nil
+	return &Repository{repo: repo, dryRun: dryRun}, nil
 }
 
 func (s *Repository) GetInfo() (*RepoInfo, error) {
@@ -72,62 +73,15 @@ func (s *Repository) GetInfo() (*RepoInfo, error) {
 	}, nil
 }
 
-func (s *Repository) GetDiffFromMain(ctx context.Context, mainBranch string) (*DiffInfo, error) {
-	head, err := s.repo.Head()
+func (s *Repository) GetDiffBetweenBranches(ctx context.Context, remote, remoteBranch, localBranch string) (*DiffInfo, error) {
+	localRef, err := s.repo.Reference(plumbing.NewBranchReferenceName(localBranch), true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get HEAD: %w", err)
+		return nil, fmt.Errorf("failed to get local branch reference: %w", err)
 	}
 
-	mainRef, err := s.repo.Reference(plumbing.NewBranchReferenceName(mainBranch), true)
+	originRef, err := s.repo.Reference(plumbing.NewRemoteReferenceName(remote, remoteBranch), true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get main branch reference: %w", err)
-	}
-
-	headCommit, err := s.repo.CommitObject(head.Hash())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get head commit: %w", err)
-	}
-
-	mainCommit, err := s.repo.CommitObject(mainRef.Hash())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get main commit: %w", err)
-	}
-
-	headTree, err := headCommit.Tree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get head tree: %w", err)
-	}
-
-	mainTree, err := mainCommit.Tree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get main tree: %w", err)
-	}
-
-	patch, err := mainTree.Patch(headTree)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate patch: %w", err)
-	}
-
-	commits, err := s.getCommitsBetween(mainCommit, headCommit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get commits: %w", err)
-	}
-
-	return &DiffInfo{
-		Diff:    patch.String(),
-		Commits: commits,
-	}, nil
-}
-
-func (s *Repository) GetLocalCommitsAheadOfOrigin(ctx context.Context, mainBranch string) (*DiffInfo, error) {
-	localRef, err := s.repo.Reference(plumbing.NewBranchReferenceName(mainBranch), true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get local main branch reference: %w", err)
-	}
-
-	originRef, err := s.repo.Reference(plumbing.NewRemoteReferenceName("origin", mainBranch), true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get origin main branch reference: %w", err)
+		return nil, fmt.Errorf("failed to get remote branch reference: %w", err)
 	}
 
 	localCommit, err := s.repo.CommitObject(localRef.Hash())
@@ -137,7 +91,7 @@ func (s *Repository) GetLocalCommitsAheadOfOrigin(ctx context.Context, mainBranc
 
 	originCommit, err := s.repo.CommitObject(originRef.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get origin commit: %w", err)
+		return nil, fmt.Errorf("failed to get remote commit: %w", err)
 	}
 
 	localTree, err := localCommit.Tree()
@@ -147,7 +101,7 @@ func (s *Repository) GetLocalCommitsAheadOfOrigin(ctx context.Context, mainBranc
 
 	originTree, err := originCommit.Tree()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get origin tree: %w", err)
+		return nil, fmt.Errorf("failed to get remote tree: %w", err)
 	}
 
 	patch, err := originTree.Patch(localTree)
@@ -172,6 +126,10 @@ func (s *Repository) CreateBranch(ctx context.Context, branchName string) error 
 		return fmt.Errorf("failed to get HEAD: %w", err)
 	}
 
+	if s.dryRun {
+		return nil
+	}
+
 	refName := plumbing.NewBranchReferenceName(branchName)
 	ref := plumbing.NewHashReference(refName, head.Hash())
 
@@ -189,6 +147,10 @@ func (s *Repository) CheckoutBranch(ctx context.Context, branchName string) erro
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
+	if s.dryRun {
+		return nil
+	}
+
 	err = worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(branchName),
 	})
@@ -197,20 +159,6 @@ func (s *Repository) CheckoutBranch(ctx context.Context, branchName string) erro
 	}
 
 	return nil
-}
-
-func (s *Repository) GetRemoteURL(remoteName string) (string, error) {
-	remote, err := s.repo.Remote(remoteName)
-	if err != nil {
-		return "", fmt.Errorf("failed to get remote: %w", err)
-	}
-
-	config := remote.Config()
-	if len(config.URLs) == 0 {
-		return "", fmt.Errorf("no URLs found for remote %s", remoteName)
-	}
-
-	return config.URLs[0], nil
 }
 
 func (s *Repository) BranchExistsOnRemote(ctx context.Context, branchName, remoteName string) (bool, error) {
@@ -238,6 +186,9 @@ func (s *Repository) PushBranch(ctx context.Context, branchName, remoteName stri
 	remote, err := s.repo.Remote(remoteName)
 	if err != nil {
 		return fmt.Errorf("failed to get remote: %w", err)
+	}
+	if s.dryRun {
+		return nil
 	}
 
 	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branchName, branchName))
