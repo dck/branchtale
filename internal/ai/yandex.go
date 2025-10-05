@@ -66,7 +66,7 @@ func (y *YandexGPT) GeneratePRTitle(ctx context.Context, diff string) (string, e
 
 func (y *YandexGPT) GeneratePRDescription(ctx context.Context, diff string) (string, error) {
 	prompt := fmt.Sprintf(
-		"Generate a pull request description based on the following git diff.\n\n"+
+		"Generate a pull request description based on the following git diff. It must be short and concise. A few sentences what's done.\n\n"+
 			"Format the response in markdown:\n\n%s",
 		diff,
 	)

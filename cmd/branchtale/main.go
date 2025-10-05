@@ -63,6 +63,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	service := pr.NewService(cfg)
 	if err := service.Run(ctx); err != nil {
+		color.New(color.FgRed).Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 

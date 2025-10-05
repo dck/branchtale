@@ -49,7 +49,6 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 
 		if len(diffInfo.Commits) == 0 {
-			fmt.Println("No local commits found ahead of origin. Your branch is up to date.")
 			return fmt.Errorf("no local commits found ahead of origin")
 		}
 		fmt.Printf("Found %s local commit(s) ahead of origin:\n", color.New(color.Bold).Sprintf("%d", len(diffInfo.Commits)))
@@ -61,6 +60,9 @@ func (s *Service) Run(ctx context.Context) error {
 		branchName, err := generator.GenerateBranchName(ctx, diffInfo.Diff)
 		if err != nil {
 			return fmt.Errorf("failed to generate branch name: %w", err)
+		}
+		if s.config.BranchPrefix != "" {
+			branchName = s.config.BranchPrefix + branchName
 		}
 		fmt.Printf("Suggested branch: %s\n", color.GreenString(branchName))
 
