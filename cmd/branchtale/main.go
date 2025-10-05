@@ -43,7 +43,7 @@ func init() {
 func runRoot(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	cfg, err := config.Load()
+	cfg, err := config.LoadEnvs()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
@@ -53,10 +53,18 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	cfg.ContentGeneration = contentGeneration
 	cfg.DryRun = dryRun
 
+	if err := cfg.Finalize(); err != nil {
+		return fmt.Errorf("failed to finalize configuration: %w", err)
+	}
+
 	if cfg.Verbose {
 		color.Green("✓ Configuration loaded successfully")
 	}
 
 	service := pr.NewService(cfg)
-	return service.Run(ctx)
+	if err := service.Run(ctx); err != nil {
+		os.Exit(1)
+	}
+
+	return nil
 }

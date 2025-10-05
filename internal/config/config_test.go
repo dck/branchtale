@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestLoad(t *testing.T) {
+func TestLoadEnvsAndFinalize(t *testing.T) {
 	// Save original env vars
 	originalGitHubToken := os.Getenv("GITHUB_TOKEN")
 	originalYandexAPIKey := os.Getenv("YANDEX_GPT_API_KEY")
@@ -23,27 +23,25 @@ func TestLoad(t *testing.T) {
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
 		os.Setenv("CONTENT_GENERATION", "local")
 
-		cfg, err := Load()
+		cfg, err := LoadEnvs()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-
+		if err := cfg.Finalize(); err != nil {
+			t.Fatalf("expected no error from Finalize, got %v", err)
+		}
 		if cfg.GitHubToken != "test-github-token" {
 			t.Errorf("expected GitHubToken 'test-github-token', got '%s'", cfg.GitHubToken)
 		}
-
 		if cfg.YandexGPTAPIKey != "test-yandex-key" {
 			t.Errorf("expected YandexGPTAPIKey 'test-yandex-key', got '%s'", cfg.YandexGPTAPIKey)
 		}
-
 		if cfg.YandexFolderID != "test-folder-id" {
 			t.Errorf("expected YandexFolderID 'test-folder-id', got '%s'", cfg.YandexFolderID)
 		}
-
 		if cfg.ContentGeneration != "local" {
 			t.Errorf("expected ContentGeneration 'local', got '%s'", cfg.ContentGeneration)
 		}
-
 		if cfg.UseAI {
 			t.Errorf("expected UseAI to be false, got true")
 		}
@@ -55,15 +53,16 @@ func TestLoad(t *testing.T) {
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
 		os.Setenv("CONTENT_GENERATION", "local")
 
-		cfg, err := Load()
+		cfg, err := LoadEnvs()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-
+		if err := cfg.Finalize(); err != nil {
+			t.Fatalf("expected no error from Finalize, got %v", err)
+		}
 		if cfg.ContentGeneration != "local" {
 			t.Errorf("expected ContentGeneration 'local', got '%s'", cfg.ContentGeneration)
 		}
-
 		if cfg.UseAI {
 			t.Errorf("expected UseAI to be false, got true")
 		}
@@ -75,15 +74,16 @@ func TestLoad(t *testing.T) {
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
 		os.Setenv("CONTENT_GENERATION", "yandex")
 
-		cfg, err := Load()
+		cfg, err := LoadEnvs()
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-
+		if err := cfg.Finalize(); err != nil {
+			t.Fatalf("expected no error from Finalize, got %v", err)
+		}
 		if cfg.ContentGeneration != "yandex" {
 			t.Errorf("expected ContentGeneration 'yandex', got '%s'", cfg.ContentGeneration)
 		}
-
 		if !cfg.UseAI {
 			t.Errorf("expected UseAI to be true, got false")
 		}
@@ -95,11 +95,10 @@ func TestLoad(t *testing.T) {
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
 		os.Setenv("CONTENT_GENERATION", "yandex")
 
-		_, err := Load()
+		_, err := LoadEnvs()
 		if err == nil {
 			t.Fatal("expected error for missing GITHUB_TOKEN")
 		}
-
 		expected := "GITHUB_TOKEN environment variable is required"
 		if err.Error() != expected {
 			t.Errorf("expected error '%s', got '%s'", expected, err.Error())
@@ -112,11 +111,14 @@ func TestLoad(t *testing.T) {
 		os.Setenv("YANDEX_FOLDER_ID", "test-folder-id")
 		os.Setenv("CONTENT_GENERATION", "yandex")
 
-		_, err := Load()
+		cfg, err := LoadEnvs()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		err = cfg.Finalize()
 		if err == nil {
 			t.Fatal("expected error for missing YANDEX_GPT_API_KEY")
 		}
-
 		expected := "YANDEX_GPT_API_KEY environment variable is required"
 		if err.Error() != expected {
 			t.Errorf("expected error '%s', got '%s'", expected, err.Error())
@@ -129,11 +131,14 @@ func TestLoad(t *testing.T) {
 		os.Unsetenv("YANDEX_FOLDER_ID")
 		os.Setenv("CONTENT_GENERATION", "yandex")
 
-		_, err := Load()
+		cfg, err := LoadEnvs()
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		err = cfg.Finalize()
 		if err == nil {
 			t.Fatal("expected error for missing YANDEX_FOLDER_ID")
 		}
-
 		expected := "YANDEX_FOLDER_ID environment variable is required"
 		if err.Error() != expected {
 			t.Errorf("expected error '%s', got '%s'", expected, err.Error())

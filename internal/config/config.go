@@ -16,7 +16,7 @@ type Config struct {
 	DryRun            bool
 }
 
-func Load() (*Config, error) {
+func LoadEnvs() (*Config, error) {
 	cfg := &Config{
 		GitHubToken:       os.Getenv("GITHUB_TOKEN"),
 		YandexGPTAPIKey:   os.Getenv("YANDEX_GPT_API_KEY"),
@@ -29,16 +29,20 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GITHUB_TOKEN environment variable is required")
 	}
 
+	return cfg, nil
+}
+
+func (cfg *Config) Finalize() error {
 	if cfg.ContentGeneration != "" && cfg.ContentGeneration != "local" {
 		if cfg.YandexGPTAPIKey == "" {
-			return nil, fmt.Errorf("YANDEX_GPT_API_KEY environment variable is required")
+			return fmt.Errorf("YANDEX_GPT_API_KEY environment variable is required")
 		}
-
 		if cfg.YandexFolderID == "" {
-			return nil, fmt.Errorf("YANDEX_FOLDER_ID environment variable is required")
+			return fmt.Errorf("YANDEX_FOLDER_ID environment variable is required")
 		}
 		cfg.UseAI = true
+	} else {
+		cfg.UseAI = false
 	}
-
-	return cfg, nil
+	return nil
 }
