@@ -73,6 +73,23 @@ func (s *Repository) GetInfo() (*RepoInfo, error) {
 	}, nil
 }
 
+func (s *Repository) GetRemoteUrl(ctx context.Context, name string) (string, error) {
+	remotes, err := s.repo.Remotes()
+	if err != nil {
+		return "", fmt.Errorf("failed to get remotes: %w", err)
+	}
+
+	for _, remote := range remotes {
+		if remote.Config().Name == name {
+			if len(remote.Config().URLs) > 0 {
+				return remote.Config().URLs[0], nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
 func (s *Repository) GetDiffBetweenBranches(ctx context.Context, remote, remoteBranch, localBranch string) (*DiffInfo, error) {
 	localRef, err := s.repo.Reference(plumbing.NewBranchReferenceName(localBranch), true)
 	if err != nil {
