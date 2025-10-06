@@ -60,6 +60,9 @@ func (s *Service) Run(ctx context.Context) error {
 			for i, commit := range diffInfo.Commits {
 				fmt.Printf("  %d. %s - %s\n", i+1, color.YellowString(commit.Hash.String()[:8]), strings.TrimSpace(commit.Message))
 			}
+
+			fmt.Println("These changes will be used to generate the branch name, PR title, and description.")
+			fmt.Printf("Diff summary:\n%s\n", color.YellowString(diffInfo.Diff))
 		}
 
 		fmt.Println("Generating a feature branch name for these changes...")

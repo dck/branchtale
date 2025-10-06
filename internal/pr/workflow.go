@@ -24,6 +24,10 @@ type Requirements struct {
 func Execute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, cfg *config.Config) error {
 	vcsProvider := vcs.NewGitHubProvider(cfg.GitHubToken)
 
+	if cfg.DryRun {
+		return DryExecute(ctx, reqs, gitRepo, cfg)
+	}
+
 	if reqs.CreateBranch {
 		if err := gitRepo.CreateBranch(ctx, reqs.BranchName); err != nil {
 			return err
@@ -73,5 +77,34 @@ func Execute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, c
 		fmt.Printf("Pull Request created: %s\n", color.GreenString(response.URL))
 	}
 
+	return nil
+}
+
+func DryExecute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, cfg *config.Config) error {
+	fmt.Println("Dry run mode enabled. The following actions would be performed:")
+	if reqs.CreateBranch {
+		fmt.Printf("- Create branch: %s\n", color.GreenString(reqs.BranchName))
+		fmt.Printf("- Checkout branch: %s\n", color.GreenString(reqs.BranchName))
+	}
+	if reqs.PushBranch {
+		fmt.Printf("- Push branch: %s to remote 'origin'\n", color.GreenString(reqs.BranchName))
+	}
+	if reqs.CreatePullRequest {
+		remoteUrl, err := gitRepo.GetRemoteUrl(ctx, "origin")
+		if err != nil {
+			return err
+		}
+
+		owner, repo, err := vcs.ParseGitHubURL(remoteUrl)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("- Create Pull Request in repository %s/%s\n", color.GreenString(owner), color.GreenString(repo))
+		fmt.Printf("  - Title: %s\n", color.GreenString(reqs.PullRequestTitle))
+		fmt.Printf("  - Description: %s\n", color.GreenString(reqs.PullRequestDescription))
+		fmt.Printf("  - Head Branch: %s\n", color.GreenString(reqs.BranchName))
+		fmt.Printf("  - Base Branch: %s\n", color.GreenString(reqs.BaseBranch))
+	}
 	return nil
 }
