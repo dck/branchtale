@@ -215,8 +215,14 @@ func (s *Repository) PushBranch(ctx context.Context, branchName, remoteName stri
 
 	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branchName, branchName))
 
+	auth, err := getSSHAuth()
+	if err != nil {
+		return fmt.Errorf("failed to load ssh key: %w", err)
+	}
+
 	err = remote.PushContext(ctx, &git.PushOptions{
 		RefSpecs: []config.RefSpec{refSpec},
+		Auth:     auth,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to push branch: %w", err)
