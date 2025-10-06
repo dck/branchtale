@@ -73,6 +73,7 @@ func (s *Service) Run(ctx context.Context) error {
 		fmt.Printf("Suggested branch: %s\n", color.GreenString(branchName))
 		r.CreateBranch = true
 		r.BranchName = branchName
+		r.PushBranch = true
 	} else {
 		if s.config.Verbose {
 			fmt.Println("You are already on a feature branch.")
@@ -104,6 +105,7 @@ func (s *Service) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to generate PR description: %w", err)
 	}
 	r.PullRequestDescription = description
+	r.CreatePullRequest = true
 	return Execute(ctx, r, gitRepo, s.config)
 }
 

@@ -184,7 +184,12 @@ func (s *Repository) BranchExistsOnRemote(ctx context.Context, branchName, remot
 		return false, fmt.Errorf("failed to get remote: %w", err)
 	}
 
-	refs, err := remote.List(&git.ListOptions{})
+	auth, err := getSSHAuth()
+	if err != nil {
+		return false, fmt.Errorf("failed to load ssh key: %w", err)
+	}
+
+	refs, err := remote.List(&git.ListOptions{Auth: auth})
 	if err != nil {
 		return false, fmt.Errorf("failed to list remote refs: %w", err)
 	}

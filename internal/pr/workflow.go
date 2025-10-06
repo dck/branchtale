@@ -29,6 +29,11 @@ func Execute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, c
 			return err
 		}
 		fmt.Printf("Created branch: %s\n", color.GreenString(reqs.BranchName))
+
+		if err := gitRepo.CheckoutBranch(ctx, reqs.BranchName); err != nil {
+			return err
+		}
+		fmt.Printf("Checked out branch: %s\n", color.GreenString(reqs.BranchName))
 	}
 
 	if reqs.PushBranch {
@@ -56,6 +61,9 @@ func Execute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, c
 			Description: reqs.PullRequestDescription,
 			HeadBranch:  reqs.BranchName,
 			BaseBranch:  reqs.BaseBranch,
+		}
+		if cfg.Verbose {
+			fmt.Printf("Creating Pull Request with this payload: %+v\n", pr)
 		}
 
 		response, err := vcsProvider.CreatePullRequest(ctx, pr)
