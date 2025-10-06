@@ -73,6 +73,23 @@ func (s *Repository) GetInfo() (*RepoInfo, error) {
 	}, nil
 }
 
+func (s *Repository) GetRemoteUrl(ctx context.Context, name string) (string, error) {
+	remotes, err := s.repo.Remotes()
+	if err != nil {
+		return "", fmt.Errorf("failed to get remotes: %w", err)
+	}
+
+	for _, remote := range remotes {
+		if remote.Config().Name == name {
+			if len(remote.Config().URLs) > 0 {
+				return remote.Config().URLs[0], nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
 func (s *Repository) GetDiffBetweenBranches(ctx context.Context, remote, remoteBranch, localBranch string) (*DiffInfo, error) {
 	localRef, err := s.repo.Reference(plumbing.NewBranchReferenceName(localBranch), true)
 	if err != nil {
@@ -167,7 +184,12 @@ func (s *Repository) BranchExistsOnRemote(ctx context.Context, branchName, remot
 		return false, fmt.Errorf("failed to get remote: %w", err)
 	}
 
-	refs, err := remote.List(&git.ListOptions{})
+	auth, err := getSSHAuth()
+	if err != nil {
+		return false, fmt.Errorf("failed to load ssh key: %w", err)
+	}
+
+	refs, err := remote.List(&git.ListOptions{Auth: auth})
 	if err != nil {
 		return false, fmt.Errorf("failed to list remote refs: %w", err)
 	}
@@ -193,8 +215,14 @@ func (s *Repository) PushBranch(ctx context.Context, branchName, remoteName stri
 
 	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", branchName, branchName))
 
+	auth, err := getSSHAuth()
+	if err != nil {
+		return fmt.Errorf("failed to load ssh key: %w", err)
+	}
+
 	err = remote.PushContext(ctx, &git.PushOptions{
 		RefSpecs: []config.RefSpec{refSpec},
+		Auth:     auth,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to push branch: %w", err)

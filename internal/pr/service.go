@@ -10,7 +10,6 @@ import (
 	"github.com/deck/branchtale/internal/ai"
 	"github.com/deck/branchtale/internal/config"
 	"github.com/deck/branchtale/internal/git"
-	"github.com/deck/branchtale/internal/vcs"
 	"github.com/fatih/color"
 )
 
@@ -25,7 +24,7 @@ func NewService(cfg *config.Config) *Service {
 }
 
 func (s *Service) Run(ctx context.Context) error {
-	gitRepo, generator, _, err := s.initializeServices()
+	gitRepo, generator, err := s.initializeServices()
 	if err != nil {
 		return err
 	}
@@ -40,8 +39,11 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 
 	fmt.Printf("Current branch: %s\n", color.GreenString(repoInfo.CurrentBranch))
-	var diffInfo *git.DiffInfo
+	r := &Requirements{
+		BaseBranch: repoInfo.MainBranch,
+	}
 
+	var diffInfo *git.DiffInfo
 	if repoInfo.IsOnMain {
 		diffInfo, err = gitRepo.GetDiffBetweenBranches(ctx, "origin", repoInfo.MainBranch, repoInfo.MainBranch)
 		if err != nil {
@@ -49,11 +51,15 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 
 		if len(diffInfo.Commits) == 0 {
-			return fmt.Errorf("no local commits found ahead of origin")
+			color.Blue("Your branch is up to date with origin/%s. Nothing to do.\n", repoInfo.MainBranch)
+			return nil
 		}
-		fmt.Printf("Found %s local commit(s) ahead of origin:\n", color.New(color.Bold).Sprintf("%d", len(diffInfo.Commits)))
-		for i, commit := range diffInfo.Commits {
-			fmt.Printf("  %d. %s - %s\n", i+1, color.YellowString(commit.Hash.String()[:8]), strings.TrimSpace(commit.Message))
+
+		if s.config.Verbose {
+			fmt.Printf("Found %s local commit(s) ahead of origin:\n", color.New(color.Bold).Sprintf("%d", len(diffInfo.Commits)))
+			for i, commit := range diffInfo.Commits {
+				fmt.Printf("  %d. %s - %s\n", i+1, color.YellowString(commit.Hash.String()[:8]), strings.TrimSpace(commit.Message))
+			}
 		}
 
 		fmt.Println("Generating a feature branch name for these changes...")
@@ -65,29 +71,21 @@ func (s *Service) Run(ctx context.Context) error {
 			branchName = s.config.BranchPrefix + branchName
 		}
 		fmt.Printf("Suggested branch: %s\n", color.GreenString(branchName))
-
-		if err := gitRepo.CreateBranch(ctx, branchName); err != nil {
-			return fmt.Errorf("failed to create branch: %w", err)
-		}
-
-		if err := gitRepo.CheckoutBranch(ctx, branchName); err != nil {
-			return fmt.Errorf("failed to checkout branch: %w", err)
-		}
-		fmt.Printf("Switched to new branch: %s\n", color.GreenString(branchName))
+		r.CreateBranch = true
+		r.BranchName = branchName
+		r.PushBranch = true
 	} else {
-		fmt.Println("You are already on a feature branch.")
+		if s.config.Verbose {
+			fmt.Println("You are already on a feature branch.")
+		}
+
 		branchOnRemote, err := gitRepo.BranchExistsOnRemote(ctx, repoInfo.CurrentBranch, "origin")
 		if err != nil {
 			return fmt.Errorf("failed to check remote branch: %w", err)
 		}
-
 		if !branchOnRemote {
-			color.New(color.Bold).Printf("Branch '%s' is not on remote\n", repoInfo.CurrentBranch)
-			fmt.Printf("Pushing branch '%s' to origin...\n", repoInfo.CurrentBranch)
-			if err := gitRepo.PushBranch(ctx, repoInfo.CurrentBranch, "origin"); err != nil {
-				return fmt.Errorf("failed to push branch: %w", err)
-			}
-			fmt.Println(color.GreenString("Branch pushed to origin successfully"))
+			r.PushBranch = true
+			fmt.Printf("Branch %s does not exist on remote. It will be pushed.\n", color.YellowString(repoInfo.CurrentBranch))
 		}
 
 		diffInfo, err = gitRepo.GetDiffBetweenBranches(ctx, "origin", repoInfo.MainBranch, repoInfo.CurrentBranch)
@@ -100,31 +98,31 @@ func (s *Service) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate PR title: %w", err)
 	}
+	r.PullRequestTitle = title
 
 	description, err := generator.GeneratePRDescription(ctx, diffInfo.Diff)
 	if err != nil {
 		return fmt.Errorf("failed to generate PR description: %w", err)
 	}
-
-	fmt.Printf("%s: %s\n", color.New(color.Bold).Sprintf("Generated PR Title"), color.GreenString(title))
-	fmt.Printf("%s:\n%s\n", color.New(color.Bold).Sprintf("Generated PR Description"), description)
-	return nil
+	r.PullRequestDescription = description
+	r.CreatePullRequest = true
+	return Execute(ctx, r, gitRepo, s.config)
 }
 
-func (s *Service) initializeServices() (*git.Repository, ContentGenerator, VCSProvider, error) {
+func (s *Service) initializeServices() (*git.Repository, ContentGenerator, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get current directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	repoPath, err := findGitRepo(cwd)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to find git repository: %w", err)
+		return nil, nil, fmt.Errorf("failed to find git repository: %w", err)
 	}
 
 	gitRepo, err := git.NewRepository(repoPath, s.config.DryRun)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to initialize git repository: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize git repository: %w", err)
 	}
 
 	var generator ContentGenerator
@@ -134,9 +132,7 @@ func (s *Service) initializeServices() (*git.Repository, ContentGenerator, VCSPr
 		generator = ai.NewLocal()
 	}
 
-	vcsProvider := vcs.NewGitHubProvider(s.config.GitHubToken)
-
-	return gitRepo, generator, vcsProvider, nil
+	return gitRepo, generator, nil
 }
 
 func findGitRepo(startPath string) (string, error) {
