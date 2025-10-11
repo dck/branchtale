@@ -58,7 +58,7 @@ func Execute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, c
 	}
 
 	if reqs.CreatePullRequest {
-		pr := &vcs.PullRequestRequest{
+		pr := &vcs.CreatePullRequestRequest{
 			Owner:       owner,
 			Repo:        repo,
 			Title:       reqs.PullRequestTitle,
