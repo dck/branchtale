@@ -12,10 +12,11 @@ import (
 )
 
 type Provider interface {
-	CreatePullRequest(ctx context.Context, req *PullRequestRequest) (*PullRequestResponse, error)
+	CreatePullRequest(ctx context.Context, req *CreatePullRequestRequest) (*CreatePullRequestResponse, error)
+	MergePullRequest(ctx context.Context, req *MergePullRequestRequest) (*MergePullRequestResponse, error)
 }
 
-type PullRequestRequest struct {
+type CreatePullRequestRequest struct {
 	Owner       string
 	Repo        string
 	Title       string
@@ -24,9 +25,22 @@ type PullRequestRequest struct {
 	BaseBranch  string
 }
 
-type PullRequestResponse struct {
+type CreatePullRequestResponse struct {
 	URL    string
 	Number int
+}
+
+type MergePullRequestRequest struct {
+	Owner       string
+	Repo        string
+	Number      int
+	MergeMethod string // "merge", "squash", or "rebase"
+}
+
+type MergePullRequestResponse struct {
+	SHA     string
+	Merged  bool
+	Message string
 }
 
 type GitHubProvider struct {
@@ -43,7 +57,7 @@ func NewGitHubProvider(token string) *GitHubProvider {
 	return &GitHubProvider{client: client}
 }
 
-func (g *GitHubProvider) CreatePullRequest(ctx context.Context, req *PullRequestRequest) (*PullRequestResponse, error) {
+func (g *GitHubProvider) CreatePullRequest(ctx context.Context, req *CreatePullRequestRequest) (*CreatePullRequestResponse, error) {
 	pr := &github.NewPullRequest{
 		Title: &req.Title,
 		Head:  &req.HeadBranch,
@@ -56,9 +70,38 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, req *PullRequest
 		return nil, fmt.Errorf("failed to create pull request: %w", err)
 	}
 
-	return &PullRequestResponse{
+	return &CreatePullRequestResponse{
 		URL:    result.GetHTMLURL(),
 		Number: result.GetNumber(),
+	}, nil
+}
+
+func (g *GitHubProvider) MergePullRequest(ctx context.Context, req *MergePullRequestRequest) (*MergePullRequestResponse, error) {
+	options := &github.PullRequestOptions{
+		MergeMethod: req.MergeMethod,
+	}
+
+	if options.MergeMethod == "" {
+		options.MergeMethod = "merge"
+	}
+
+	result, _, err := g.client.PullRequests.Merge(
+		ctx,
+		req.Owner,
+		req.Repo,
+		req.Number,
+		"", // commitMessage
+		options,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge pull request: %w", err)
+	}
+
+	return &MergePullRequestResponse{
+		SHA:     result.GetSHA(),
+		Merged:  result.GetMerged(),
+		Message: result.GetMessage(),
 	}, nil
 }
 

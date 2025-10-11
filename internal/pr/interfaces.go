@@ -13,5 +13,6 @@ type ContentGenerator interface {
 }
 
 type VCSProvider interface {
-	CreatePullRequest(ctx context.Context, req *vcs.PullRequestRequest) (*vcs.PullRequestResponse, error)
+	CreatePullRequest(ctx context.Context, req *vcs.CreatePullRequestRequest) (*vcs.CreatePullRequestResponse, error)
+	MergePullRequest(ctx context.Context, req *vcs.MergePullRequestRequest) (*vcs.MergePullRequestResponse, error)
 }
