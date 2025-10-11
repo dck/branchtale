@@ -223,6 +223,7 @@ func (s *Repository) PushBranch(ctx context.Context, branchName, remoteName stri
 	err = remote.PushContext(ctx, &git.PushOptions{
 		RefSpecs: []config.RefSpec{refSpec},
 		Auth:     auth,
+		Force:    true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to push branch: %w", err)
