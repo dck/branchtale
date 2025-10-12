@@ -109,6 +109,7 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 	r.PullRequestDescription = description
 	r.CreatePullRequest = true
+	r.MergePullRequest = true
 	return Execute(ctx, r, gitRepo, s.config)
 }
 
