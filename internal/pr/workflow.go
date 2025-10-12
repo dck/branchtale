@@ -16,6 +16,7 @@ type Requirements struct {
 	BranchName             string
 	BaseBranch             string
 	CreatePullRequest      bool
+	MergePullRequest       bool
 	PullRequestTitle       string
 	PullRequestDescription string
 	PullRequestTags        []string
@@ -75,6 +76,25 @@ func Execute(ctx context.Context, reqs *Requirements, gitRepo *git.Repository, c
 			return err
 		}
 		fmt.Printf("Pull Request created: %s\n", color.GreenString(response.URL))
+
+		if reqs.MergePullRequest {
+			mergeReq := &vcs.MergePullRequestRequest{
+				Owner:       owner,
+				Repo:        repo,
+				Number:      response.Number,
+				MergeMethod: "merge",
+			}
+			mergeResp, err := vcsProvider.MergePullRequest(ctx, mergeReq)
+
+			if err != nil {
+				return err
+			}
+			if mergeResp.Merged {
+				fmt.Printf("Pull Request #%d merged successfully with SHA: %s\n", response.Number, color.GreenString(mergeResp.SHA))
+			} else {
+				fmt.Printf("Pull Request #%d was not merged. Message: %s\n", response.Number, color.YellowString(mergeResp.Message))
+			}
+		}
 	}
 
 	return nil
