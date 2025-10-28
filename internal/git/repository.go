@@ -170,7 +170,10 @@ func (s *Repository) CheckoutBranch(ctx context.Context, branchName string) erro
 
 	err = worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(branchName),
+		Create: false,
+		Keep:   true,
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to checkout branch: %w", err)
 	}
